@@ -2,6 +2,42 @@ import tkinter
 import random
 import math
 
+
+class Field:
+    MAX_LIFETIME: int = 30
+    INITIAL_FIELD_STRENGTH: float = 10.0
+    LIGHT_SPEED: float = 0.7
+    FIELD_DECAY: float = 0.9
+
+    def __init__(self, x: int, y: int, row: int, column: int):
+        self.x = x
+        self.y = y
+        self.row = row
+        self.column = column
+        self.lifetime = 0
+        self.alive:bool = True
+
+    @property
+    def radius(self):
+        return self.lifetime * Field.LIGHT_SPEED
+
+    def tick(self, rects):
+        self.lifetime += 1
+        if self.lifetime>Field.MAX_LIFETIME:
+            self.alive = False
+        if not self.alive:
+            return
+        for row in rects:
+            for rect in row:
+                delta_x = self.row - rect.row
+                delta_y = self.column - rect.column
+                dist = math.sqrt(delta_x * delta_x + delta_y * delta_y)
+                if dist <= self.radius:
+                    # add = Field.INITIAL_FIELD_STRENGTH / ( self.radius * self.radius * Field.FIELD_DECAY )
+                    # print(add)
+                    rect.intensity += Field.INITIAL_FIELD_STRENGTH / (self.radius * self.radius * Field.FIELD_DECAY)
+
+
 class Rect:
     
     def __init__(self, x, y, row:int, column:int, width, height, canvas, color=(100, 100, 100)):
@@ -12,11 +48,12 @@ class Rect:
         self.column = column
         self.__width:int = width
         self.__height:int = height
+        self.__intensity:float = 0.0
         self.__color = color
         self.__handle:int = self.__canvas.create_rectangle(self.x, self.y, self.width, self.height, width=0, fill=self.color_hex)
     
     def __str__(self):
-        return f"Rect[x:{self.x} y:{self.y} w:{self.width}, h:{self.height}]"
+        return f"Rect[x:{self.x} y:{self.y} w:{self.width}, h:{self.height}, i:{self.intensity}]"
     
     @property
     def x(self) -> int:
@@ -76,62 +113,33 @@ class Rect:
     
     @intensity.setter
     def intensity(self, value):
-        self.__intensity = value
-        col = 1 - 1 / ( max(0.01, 1) / 10 + 1)
+        value_ = min(10.0, max(0.01, float(value)))
+        self.__intensity = value_
+        col = 1 - 1 / ( value_ / 10 + 1)
         col_inv = 1 - col
         red = int(255 * col)
-        green = int(90 * col_inv)
-        blue = int(90 * col_inv)
+        green = int(255 * col_inv)
+        blue = int(0)
         #print(f"setting color to {red} {green} {blue}")
         self.color=(red, green, blue)
     
-    def update(self):
+    def mesh(self):
         self.__canvas.coords(self.__handle, self.x, self.y, self.x2, self.y2)
         self.__canvas.itemconfigure(self.__handle, fill=self.color_hex)
 
 
-class Field:
-    
-    MAX_LIFETIME:int = 10
-    INITIAL_FIELD_STRENGTH:float = 100
-    LIGHT_SPEED:float = 0.7
-    FIELD_DECAY:float = 1.0
-    
-    def __init__(self, x:int, y:int, row:int, column:int):
-        self.x = x
-        self.y = y
-        self.row = row
-        self.column = column
-        self.lifetime = 0
-    
-    @property
-    def radius(self):
-        return self.lifetime * Field.LIGHT_SPEED
-    
-    def update(self, rects):
-        self.lifetime += 1;
-        for row in rects:
-            for rect in row:
-                delta_x = self.row - rect.row
-                delta_y = self.column - rect.column
-                dist = math.sqrt(delta_x * delta_x + delta_y * delta_y)
-                if dist <= self.radius:
-                    add = Field.INITIAL_FIELD_STRENGTH / ( self.radius * self.radius * Field.FIELD_DECAY )
-                    print(add)
-                    rect.intensity += Field.INITIAL_FIELD_STRENGTH / ( self.radius * self.radius * Field.FIELD_DECAY )
-        
-        
-
-
 class CustomCanvas(tkinter.Canvas):
+
+    REFRESH_RATE:int = 30
+    REFRESH_INTERVAL:int = int(1000/REFRESH_RATE)
     
     @property
     def rows(self) -> int:
-        return 30;
+        return 50
     
     @property
     def columns(self) -> int:
-        return 30
+        return 50
         
     @property
     def width(self) -> int:
@@ -164,11 +172,11 @@ class CustomCanvas(tkinter.Canvas):
         self.bind('<ButtonRelease-1>', self.on_left_mouse_up)
         self.bind('<Motion>', self.on_mouse_moved)
         self.load()
-        self.after(0, self.update)
+        self.after(CustomCanvas.REFRESH_INTERVAL, self.loop)
     
     def get_rect_at_pos(self, x:int, y:int):
-        row = int(math.floor(x / self.segment_width))
-        column = int(math.floor(y / self.segment_height))
+        column = int(math.floor(x / self.segment_width))
+        row = int(math.floor(y / self.segment_height))
         if row < 0:
             return None
         if row > len(self.rectangles) - 1:
@@ -199,29 +207,31 @@ class CustomCanvas(tkinter.Canvas):
     def logic_loop(self):
         if self.is_left_down:
             rect = self.get_rect_at_pos(self.__mouse_x, self.__mouse_y)
-            print("appending new field")
-            self.fields.append(Field(rect.x, rect.y, rect.row, rect.column))
+            if rect.__class__ == Rect:
+                self.fields.append(Field(rect.x, rect.y, rect.row, rect.column))
         for row in self.rectangles:
             for rect in row:
                 rect.intensity = 0.0
         for field in self.fields:
-            field.update(self.rectangles);
+            field.tick(self.rectangles)
+        for field in filter(lambda x: not x.alive,self.fields):
+            self.fields.remove(field)
     
     def graphics_loop(self):
-        for row in range(self.rows):
-            rects = self.rectangles[row]
-            for column in range(self.columns):
-                rect = rects[column]
-                rect.x = column * self.segment_width
-                rect.y = row * self.segment_height
+        for row_index, row in enumerate(self.rectangles):
+            for column_index, rect in enumerate(row):
+                rect.x = column_index * self.segment_width
+                rect.y = row_index * self.segment_height
                 rect.width = self.segment_width
                 rect.height = self.segment_height
-                rect.update()
-    
-    def update(self):
+                rect.mesh()
+
+    #runs the simulation and updates the gui
+    #periodically called by the canvas
+    def loop(self):
         self.logic_loop()
         self.graphics_loop()
-        self.after(1000, self.update)
+        self.after(CustomCanvas.REFRESH_INTERVAL, self.loop)
 
 
 root:tkinter.Tk = tkinter.Tk()
