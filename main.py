@@ -121,7 +121,7 @@ class Rect:
         red = int(255 * col)
         green = int(255 * col_inv)
         blue = int(0)
-        print(f"setting color to {col} {col_inv}")
+        #print(f"setting color to {col} {col_inv}")
         self.color=(red, green, blue)
     
     def mesh(self):
