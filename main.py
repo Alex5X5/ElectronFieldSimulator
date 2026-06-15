@@ -4,7 +4,7 @@ import math
 
 
 class Field:
-    MAX_LIFETIME: int = 20
+    MAX_LIFETIME: int = 30
     INITIAL_FIELD_STRENGTH: float = 10.0
     LIGHT_SPEED: float = 0.7
     FIELD_DECAY: float = 0.9
@@ -32,7 +32,9 @@ class Field:
                 delta_x = self.row - rect.row
                 delta_y = self.column - rect.column
                 dist = math.sqrt(delta_x * delta_x + delta_y * delta_y)
-                if dist <= self.radius:
+                epsilon:float = 1
+                if dist >= self.radius - epsilon and dist <= self.radius + epsilon:
+                #if dist <= self.radius:
                     # add = Field.INITIAL_FIELD_STRENGTH / ( self.radius * self.radius * Field.FIELD_DECAY )
                     # print(add)
                     dist_ = min(max(dist, 0.01), 10.0)
@@ -131,16 +133,16 @@ class Rect:
 
 class CustomCanvas(tkinter.Canvas):
 
-    REFRESH_RATE:int = 30
+    REFRESH_RATE:int = 50
     REFRESH_INTERVAL:int = int(1000/REFRESH_RATE)
     
     @property
     def rows(self) -> int:
-        return 50
+        return 70
     
     @property
     def columns(self) -> int:
-        return 50
+        return 70
         
     @property
     def width(self) -> int:
