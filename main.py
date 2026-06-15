@@ -4,7 +4,7 @@ import math
 
 
 class Field:
-    MAX_LIFETIME: int = 30
+    MAX_LIFETIME: int = 20
     INITIAL_FIELD_STRENGTH: float = 10.0
     LIGHT_SPEED: float = 0.7
     FIELD_DECAY: float = 0.9
@@ -35,7 +35,8 @@ class Field:
                 if dist <= self.radius:
                     # add = Field.INITIAL_FIELD_STRENGTH / ( self.radius * self.radius * Field.FIELD_DECAY )
                     # print(add)
-                    rect.intensity += Field.INITIAL_FIELD_STRENGTH / (self.radius * self.radius * Field.FIELD_DECAY)
+                    dist_ = min(max(dist, 0.01), 10.0)
+                    rect.intensity += Field.INITIAL_FIELD_STRENGTH / (dist_ * dist_ * Field.FIELD_DECAY)
 
 
 class Rect:
@@ -115,12 +116,12 @@ class Rect:
     def intensity(self, value):
         value_ = min(10.0, max(0.01, float(value)))
         self.__intensity = value_
-        col = 1 - 1 / ( value_ / 10 + 1)
-        col_inv = 1 - col
+        col:float = 1.0 - 1.0 / ( value_ / 10.0 + 1.0)
+        col_inv = 1.0 - col
         red = int(255 * col)
         green = int(255 * col_inv)
         blue = int(0)
-        #print(f"setting color to {red} {green} {blue}")
+        print(f"setting color to {col} {col_inv}")
         self.color=(red, green, blue)
     
     def mesh(self):
